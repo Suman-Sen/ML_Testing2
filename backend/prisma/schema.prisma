@@ -1,0 +1,244 @@
+generator client {
+    provider = "prisma-client-js"
+    output   = "./generated/prisma"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id        String  @id @default(cuid())
+    emp_id    String? @unique
+    email     String  @unique
+    firstName String?
+    lastName  String?
+    role      String
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    version String @default("dv-1.0.0")
+
+    batches Batch[]
+}
+
+model Batch {
+    id            String   @id @default(cuid())
+    scanType      scanType
+    totalNumFiles Int?
+    createdAt     DateTime @default(now())
+    creatorId     String
+    creator       User     @relation(fields: [creatorId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+    version String @default("dv-1.0.0")
+
+    documents  DocumentResult[]
+    images     ImageResult[]
+    dbs        Db[]
+    piiSelects PiiSelected[]
+}
+
+model PiiSelected {
+    id      String   @id @default(cuid())
+    piiName String[]
+
+    version String @default("dv-1.0.0")
+
+    batchId String?
+    batch   Batch?  @relation(fields: [batchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+    @@index([batchId])
+}
+
+model ImageResult {
+    id         String     @id @default(cuid())
+    fileName   String
+    label      imageLabel
+    confidence Int
+    createdAt  DateTime   @default(now())
+    updatedAt  DateTime   @updatedAt
+
+    version String @default("dv-1.0.0")
+
+    batchId String?
+    Batch   Batch?  @relation(fields: [batchId], references: [id])
+}
+
+model DocumentResult {
+    id        String   @id @default(cuid())
+    fileName  String
+    fileType  String?
+    piiFound  Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    version String @default("dv-1.0.0")
+
+    batchId String?
+    batch   Batch?  @relation(fields: [batchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+    classifications DocumentClassification[]
+
+    @@index([batchId])
+}
+
+model DocumentClassification {
+    id         String         @id @default(cuid())
+    piiType    String
+    count      Int
+    documentId String
+    document   DocumentResult @relation(fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    version String @default("dv-1.0.0")
+
+    @@index([documentId])
+}
+
+model Db {
+    id                   String     @id @default(cuid())
+    databaseName         String
+    scanType             dbScanType
+    dbType               dbType
+    totalNumOfTableScans Int?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    version String @default("dv-1.0.0")
+
+    batchId String
+    batch   Batch  @relation(fields: [batchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    dbPiiResults      dbFullPiiResult[]
+    dbFullPiiMetadata dbFullPiiMetadata[]
+
+    // dbResults      dbMetaResult[]
+    // dbTableResults dbTableResult[]
+    @@index([batchId])
+}
+
+model dbFullPiiMetadata {
+    id          String @id @default(cuid())
+    tableName   String
+    rowCount    Int
+    pii         Int
+    identifiers Int
+    behavioral  Int
+    owner       String
+
+    version String @default("dv-1.0.0")
+    dbId    String
+    db      Db     @relation(fields: [dbId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    @@index([dbId])
+}
+
+model dbFullPiiResult {
+    id             String          @id @default(cuid())
+    tableName      String
+    columnName     String?
+    datatype       String?
+    classification Classification?
+    scanned        Int?
+    matched        Int?
+    accuracy       Float?
+
+    version String @default("dv-1.0.0")
+
+    dbId String
+    db   Db     @relation(fields: [dbId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+    @@index([dbId])
+}
+
+enum imageLabel {
+    AADHAAR
+    PAN
+    PASSPORT
+}
+
+enum scanType {
+    IMAGE_SCAN
+    PDF_SCAN
+    DOCUMENT_SCAN
+}
+
+enum dbScanType {
+    PII_META
+    PII_FULL
+    PII_TABLE
+}
+
+enum dbType {
+    POSTGRES
+    MYSQL
+    ORACLE
+}
+
+enum Classification {
+    pii
+    identifiers
+    Behavioral
+    Operational
+}
+
+// model Document {
+//     id           String   @id @default(cuid())
+//     FileName     String
+//     piiFound     Boolean
+//     numberOfPiis Int
+//     foundPiis    String[]
+
+//     createdAt DateTime @default(now())
+//     updatedAt DateTime @updatedAt
+
+//     version String @default("dv-1.0.0")
+
+//     batchId        String?
+//     Batch          Batch?           @relation(fields: [batchId], references: [id])
+//     documentResult DocumentResult[]
+// }
+
+// // stored based on pii type
+// model dbMetaResult {
+//     id       String  @id @default(cuid())
+//     found    Boolean
+//     piiName  String
+//     metadata Json // store {columnId : string, tableName : xyz, columnName : name, dataType: string}
+
+//     createdAt DateTime @default(now())
+//     updatedAt DateTime @updatedAt
+
+//     version String @default("dv-1.0.0")
+
+//     dbId String
+//     db   Db     @relation(fields: [dbId], references: [id])
+// }
+
+// model dbTableResult {
+//     id         String @id @default(cuid())
+//     tableName  String
+//     // columnName Json //{piiType:string, rowName:string, columnId: string}
+
+//     version String @default("dv-1.0.0")
+
+//     dbId String
+//     db   Db     @relation(fields: [dbId], references: [id])
+// }
+
+// model DocumentResult {
+//     id      String @id @default(cuid())
+//     piiType String
+//     // found     Boolean
+//     count   Int
+
+//     createdAt DateTime @default(now())
+//     updatedAt DateTime @updatedAt
+
+//     version String @default("dv-1.0.0")
+
+//     documentId String
+//     document   DocumentResult @relation(fields: [documentId], references: [id])
+// }
